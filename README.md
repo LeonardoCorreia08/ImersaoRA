@@ -1,4 +1,4 @@
-# ImersaoRA
+# Imersão RA
 
 Código criado para utilização junto ao curso de imersaoRA
 
