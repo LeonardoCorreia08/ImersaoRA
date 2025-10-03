@@ -4,7 +4,7 @@ Código criado para utilização junto ao curso de imersaoRA
 
 <p align="center"><img src="./imersao.JPG" width="500"></p>
 
-## Repertorio para os Desafios de Projeto das Unidades
+## Repertório para os Desafios de Projeto das Unidades
 
 
 Imersão em Realidade Aumentada — explorando experiências interativas que conectam o mundo físico ao digital.
