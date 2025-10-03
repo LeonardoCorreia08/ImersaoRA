@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <!-- 
+        viewport-fit=cover: Faz a página ocupar toda a tela em dispositivos com notch (iPhone X+)
+        user-scalable=no: Desabilita o zoom manual (importante para AR)
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Projeto WebAR - Leon Kennedy</title>
+    
+    <!-- 
+        ============================================
+        BIBLIOTECAS NECESSÁRIAS PARA WEBAR
+        ============================================
+        A-Frame: Framework para criar experiências 3D/VR na web
+        AR.js: Biblioteca que adiciona capacidades de AR ao A-Frame
+        A-Frame Extras: Componentes adicionais (como animation-mixer para animações GLTF)
+    -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+    
+    <style>
+        /* ============================================
+           ESTILOS GERAIS DA PÁGINA
+           ============================================ */
+        
+        body {
+            margin: 0;           /* Remove margens padrão do navegador */
+            overflow: hidden;    /* Esconde scrollbars (importante para fullscreen AR) */
+        }
+        
+        /* ============================================
+           BOTÃO DE FECHAR (Canto Superior Direito)
+           ============================================ */
+        #closeButton {
+            position: absolute;              /* Posicionamento absoluto na tela */
+            top: 20px;                       /* 20px do topo */
+            right: 20px;                     /* 20px da direita */
+            width: 50px;                     /* Largura do botão */
+            height: 50px;                    /* Altura do botão (quadrado) */
+            background: rgba(255, 0, 0, 0.85); /* Vermelho semi-transparente */
+            border: 2px solid white;         /* Borda branca de 2px */
+            border-radius: 50%;              /* Torna o botão circular */
+            cursor: pointer;                 /* Muda cursor para pointer ao passar sobre */
+            z-index: 1001;                   /* Fica acima de tudo (maior que instructions) */
+            display: flex;                   /* Flexbox para centralizar conteúdo */
+            align-items: center;             /* Centraliza verticalmente */
+            justify-content: center;         /* Centraliza horizontalmente */
+            font-size: 28px;                 /* Tamanho do "×" */
+            color: white;                    /* Cor do texto */
+            font-weight: bold;               /* Texto em negrito */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4); /* Sombra para destacar */
+            transition: all 0.3s ease;       /* Animação suave de 0.3 segundos */
+            font-family: Arial, sans-serif;  /* Fonte padrão */
+            user-select: none;               /* Impede seleção do texto */
+        }
+        
+        /* Efeito ao passar o mouse sobre o botão (apenas desktop) */
+        #closeButton:hover {
+            background: rgba(255, 50, 50, 1);    /* Vermelho mais forte */
+            transform: scale(1.1) rotate(90deg); /* Aumenta 10% e rotaciona 90° */
+            box-shadow: 0 6px 20px rgba(255,0,0,0.5); /* Sombra vermelha */
+        }
+        
+        /* Efeito ao clicar no botão */
+        #closeButton:active {
+            transform: scale(0.95) rotate(90deg); /* Diminui um pouco (feedback tátil) */
+        }
+        
+        /* ============================================
+           PAINEL DE INSTRUÇÕES (Parte Inferior)
+           ============================================ */
+        #instructions {
+            position: absolute;              /* Posicionamento absoluto */
+            bottom: 20px;                    /* 20px do fundo */
+            left: 50%;                       /* Começa no meio horizontal */
+            transform: translateX(-50%);     /* Move 50% do próprio tamanho para esquerda (centraliza) */
+            background: rgba(0, 0, 0, 0.85); /* Fundo preto semi-transparente */
+            color: white;                    /* Texto branco */
+            padding: 15px 30px;              /* Espaçamento interno */
+            border-radius: 12px;             /* Bordas arredondadas */
+            font-family: 'Segoe UI', Arial, sans-serif; /* Fontes modernas */
+            text-align: center;              /* Texto centralizado */
+            z-index: 1000;                   /* Fica acima da cena AR */
+            max-width: 85%;                  /* Máximo 85% da largura da tela */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4); /* Sombra suave */
+        }
+        
+        /* Título das instruções */
+        #instructions h3 {
+            margin: 0 0 12px 0;  /* Remove margem superior, adiciona inferior */
+            font-size: 18px;     /* Tamanho da fonte */
+            font-weight: bold;   /* Negrito */
+        }
+        
+        /* Parágrafos de instrução */
+        #instructions p {
+            margin: 8px 0;       /* Espaçamento entre parágrafos */
+            font-size: 15px;     /* Tamanho da fonte */
+            line-height: 1.4;    /* Altura da linha (espaçamento vertical) */
+        }
+        
+        /* Ícones dentro das instruções */
+        .icon {
+            display: inline-block;  /* Permite margem */
+            margin-right: 8px;      /* Espaço entre ícone e texto */
+        }
+    </style>
+</head>
+<body>
+    <!-- ============================================
+         INTERFACE DO USUÁRIO (UI)
+         ============================================ -->
+    
+    <!-- Botão para fechar/sair do WebAR -->
+    <div id="closeButton" title="Fechar WebAR">×</div>
+    
+    <!-- Painel de instruções (desaparece após 7 segundos) -->
+    <div id="instructions">
+        <h3>🎮 Interações Disponíveis</h3>
+        <p><span class="icon">👆</span><strong>Toque rápido:</strong> Animar e girar 360°</p>
+        <p><span class="icon">✋</span><strong>Pressionar e segurar:</strong> Aumentar tamanho</p>
+        <p><span class="icon">↔️</span><strong>Arrastar horizontalmente:</strong> Girar manualmente</p>
+    </div>
+
+    <!-- ============================================
+         CENA A-FRAME (Realidade Aumentada)
+         ============================================ -->
+    <a-scene
+        embedded
+        arjs="
+            sourceType: webcam;              
+            debugUIEnabled: false;           
+            detectionMode: mono_and_matrix;  
+            matrixCodeType: 3x3;             
+            trackingMethod: best;            
+            maxDetectionRate: 60;            
+        "
+        vr-mode-ui="enabled: false"
+        renderer="
+            logarithmicDepthBuffer: true;    
+            precision: medium;               
+            antialias: true;                 
+            colorManagement: true;           
+        "
+        gesture-detector>
+        
+        <!-- ============================================
+             ASSETS (Recursos da Cena)
+             ============================================
+             Pré-carrega os modelos 3D antes de usar
+        -->
+        <a-assets>
+            <!-- 
+                Modelo GLTF do Leon Kennedy
+                O arquivo leon.glb deve estar na mesma pasta 
+            -->
+            <a-asset-item id="leonModel" src="leon.glb"></a-asset-item>
+        </a-assets>
+        
+        <!-- Câmera virtual (ponto de vista do usuário) -->
+        <a-entity camera></a-entity>
+
+        <!-- ============================================
+             MARCADOR AR (Padrão Hiro)
+             ============================================
+             O marcador Hiro é um quadrado preto com borda preta
+             Imprima de: https://github.com/LeonardoCorreia08/ImersaoRA/blob/main/assets/hiro.png
+        -->
+        <a-marker 
+            preset="hiro"                    
+            id="marker"                      
+            raycaster="objects: .clickable"  
+            emitevents="true"                
+            cursor="fuse: false; rayOrigin: mouse;">
+            
+            <!-- Container que agrupa modelo e luzes -->
+            <a-entity id="model-container" position="0 0 0">
+                
+                <!-- ============================================
+                     SISTEMA DE ILUMINAÇÃO
+                     ============================================
+                     Múltiplas luzes 
+                -->
+                
+                <!-- Luz Ambiente: Iluminação geral uniforme (sem direção) -->
+                <a-light 
+                    type="ambient"           
+                    color="#ffffff"          
+                    intensity="1.2">         
+                </a-light>
+                
+                <!-- Luz Direcional: Simula luz do sol (vem de uma direção específica) -->
+                <a-light 
+                    type="directional"       
+                    color="#ffffff"          
+                    intensity="1.5"          
+                    position="2 4 2">        
+                </a-light>
+                
+                <!-- Luz Pontual 1: Luz de preenchimento (reduz sombras escuras) -->
+                <a-light 
+                    type="point"             
+                    color="#b3d9ff"          
+                    intensity="0.8"          
+                    position="-2 2 2"        
+                    distance="5">            
+                </a-light>
+                
+                <!-- Luz Pontual 2: Luz de destaque (adiciona brilho) -->
+                <a-light 
+                    type="point"             
+                    color="#ffffff"          
+                    intensity="0.6"          
+                    position="0 3 -2"        
+                    distance="4">            
+                </a-light>
+                
+                <!-- ============================================
+                     MODELO 3D - LEON KENNEDY
+                     ============================================ -->
+                <a-entity
+                    id="model"                    
+                    class="clickable"             
+                    gltf-model="#leonModel"       
+                    scale="1.2 1.2 1.2"           
+                    position="0 0 0"              
+                    rotation="0 180 0"            
+                    animation-mixer               
+                    gesture-handler>              
+                </a-entity>
+            </a-entity>
+            
+        </a-marker>
+    </a-scene>
+
+    <script>
+        /* ============================================
+           JAVASCRIPT - LÓGICA DE INTERAÇÕES
+           ============================================ */
+        
+        // ========================================
+        // COMPONENTE 1: DETECTOR DE GESTOS
+        // ========================================
+        /*
+            Este componente detecta 3 tipos de gestos:
+            1. Tap (toque rápido)
+            2. Press (pressionar e segurar)
+            3. Drag (arrastar)
+        */
+        AFRAME.registerComponent('gesture-detector', {
+            // Schema define propriedades configuráveis do componente
+            schema: {
+                enabled: { default: true }  // Pode ligar/desligar o detector
+            },
+            
+            // init(): Executado uma vez quando o componente é inicializado
+            init: function() {
+                // Bind garante que "this" sempre se refere ao componente
+                this.handleTap = this.handleTap.bind(this);
+                this.handleTouchStart = this.handleTouchStart.bind(this);
+                this.handleTouchEnd = this.handleTouchEnd.bind(this);
+                this.handleTouchMove = this.handleTouchMove.bind(this);
+                
+                // Variáveis para rastrear o estado do toque
+                this.startX = 0;        // Posição X inicial do toque
+                this.startY = 0;        // Posição Y inicial do toque
+                this.isDragging = false; // Se está arrastando
+                this.moved = false;      // Se o dedo se moveu
+            },
+            
+            // play(): Executado quando o componente é ativado
+            play: function() {
+                const canvas = this.el.sceneEl.canvas;  // Pega o canvas da cena
+                
+                // Adiciona event listeners (escutadores de eventos)
+                canvas.addEventListener('click', this.handleTap);
+                canvas.addEventListener('touchstart', this.handleTouchStart);
+                canvas.addEventListener('touchend', this.handleTouchEnd);
+                canvas.addEventListener('touchmove', this.handleTouchMove);
+            },
+            
+            // pause(): Executado quando o componente é desativado
+            pause: function() {
+                const canvas = this.el.sceneEl.canvas;
+                
+                // Remove event listeners (boa prática para economizar memória)
+                canvas.removeEventListener('click', this.handleTap);
+                canvas.removeEventListener('touchstart', this.handleTouchStart);
+                canvas.removeEventListener('touchend', this.handleTouchEnd);
+                canvas.removeEventListener('touchmove', this.handleTouchMove);
+            },
+            
+            // Trata clicks do mouse (Desktop)
+            handleTap: function(evt) {
+                console.log('🖱️ Click detectado (Desktop)');
+                // Emite evento customizado que será capturado pelo gesture-handler
+                this.el.emit('gesture-tap', evt);
+            },
+            
+            // Quando o usuário toca na tela
+            handleTouchStart: function(evt) {
+                // Verifica se há exatamente 1 dedo na tela
+                if (evt.touches && evt.touches.length === 1) {
+                    // Guarda a posição inicial do toque
+                    this.startX = evt.touches[0].clientX;
+                    this.startY = evt.touches[0].clientY;
+                    this.startTime = Date.now();  // Guarda o tempo (para detectar tap rápido)
+                    this.isDragging = false;
+                    this.moved = false;
+                }
+                
+                // Emite evento de início de pressão
+                this.el.emit('gesture-pressstart', evt);
+            },
+            
+            // Quando o usuário move o dedo na tela
+            handleTouchMove: function(evt) {
+                if (evt.touches && evt.touches.length === 1) {
+                    // Calcula quanto o dedo se moveu
+                    const deltaX = evt.touches[0].clientX - this.startX;
+                    const deltaY = evt.touches[0].clientY - this.startY;
+                    
+                    // Teorema de Pitágoras: distância = √(x² + y²)
+                    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    
+                    // Se moveu mais de 15 pixels, considera como arrasto
+                    if (distance > 15) {
+                        this.moved = true;
+                        this.isDragging = true;
+                        // Emite evento de arrasto com a variação em X
+                        this.el.emit('gesture-drag', { deltaX: deltaX });
+                    }
+                }
+            },
+            
+            // Quando o usuário tira o dedo da tela
+            handleTouchEnd: function(evt) {
+                // Calcula há quanto tempo o dedo está pressionado
+                const touchDuration = Date.now() - this.startTime;
+                
+                // Detecta TAP: não moveu E foi rápido (menos de 300ms)
+                if (!this.moved && touchDuration < 300) {
+                    console.log('👆 Tap detectado (Mobile)!');
+                    this.el.emit('gesture-tap', evt);
+                }
+                
+                // Emite evento de fim de pressão
+                this.el.emit('gesture-pressend', evt);
+                
+                // Reseta as flags
+                this.isDragging = false;
+                this.moved = false;
+            }
+        });
+        
+        // ========================================
+        // COMPONENTE 2: GERENCIADOR DE INTERAÇÕES
+        // ========================================
+        /*
+            Este componente responde aos gestos detectados acima
+            e executa as ações no modelo 3D:
+            - Tap: Anima e gira 360°
+            - Press: Aumenta tamanho
+            - Drag: Rotaciona manualmente
+        */
+        AFRAME.registerComponent('gesture-handler', {
+            schema: {
+                enabled: { default: true },
+                scaleMin: { default: 1.2 },  // Escala mínima
+                scaleMax: { default: 5 }      // Escala máxima
+            },
+            
+            init: function() {
+                // Guarda a escala inicial do modelo
+                this.initialScale = this.el.object3D.scale.clone();
+                this.currentScale = 1;        // Escala atual (multiplicador)
+                this.isPressed = false;       // Se está sendo pressionado
+                this.scaleInterval = null;    // Intervalo para aumentar escala
+                this.lastDragX = 0;           // Última posição do arrasto
+                
+                // Faz bind de todas as funções
+                this.onTap = this.onTap.bind(this);
+                this.onPressStart = this.onPressStart.bind(this);
+                this.onPressEnd = this.onPressEnd.bind(this);
+                this.onDrag = this.onDrag.bind(this);
+                
+                // Registra listeners para os eventos emitidos pelo gesture-detector
+                const sceneEl = this.el.sceneEl;
+                sceneEl.addEventListener('gesture-tap', this.onTap);
+                sceneEl.addEventListener('gesture-pressstart', this.onPressStart);
+                sceneEl.addEventListener('gesture-pressend', this.onPressEnd);
+                sceneEl.addEventListener('gesture-drag', this.onDrag);
+                
+                console.log('✓ Sistema de interações carregado');
+            },
+            
+            // ========================================
+            // INTERAÇÃO 1: TOQUE RÁPIDO (TAP)
+            // Anima com pulso e rotaciona 360°
+            // ========================================
+            onTap: function(evt) {
+                console.log('👆 Executando animação de tap (360° + pulso)');
+                
+                // Remove animações anteriores (evita conflitos)
+                this.el.removeAttribute('animation');
+                this.el.removeAttribute('animation__rotation');
+                
+                // ANIMAÇÃO 1: Pulso (aumenta e diminui rapidamente)
+                this.el.setAttribute('animation', {
+                    property: 'scale',  // Propriedade a animar
+                    from: {             // Valor inicial
+                        x: this.initialScale.x * this.currentScale,
+                        y: this.initialScale.y * this.currentScale,
+                        z: this.initialScale.z * this.currentScale
+                    },
+                    to: {               // Valor final (30% maior)
+                        x: this.initialScale.x * this.currentScale * 1.3,
+                        y: this.initialScale.y * this.currentScale * 1.3,
+                        z: this.initialScale.z * this.currentScale * 1.3
+                    },
+                    dur: 200,           // Duração: 200ms
+                    easing: 'easeOutQuad', // Curva de animação (rápido no início, devagar no fim)
+                    loop: 1,            // Repete 1 vez
+                    dir: 'alternate'    // Vai e volta (aumenta e diminui)
+                });
+                
+                // ANIMAÇÃO 2: Rotação 360°
+                const currentRotation = this.el.getAttribute('rotation');
+                this.el.setAttribute('animation__rotation', {
+                    property: 'rotation',
+                    from: {
+                        x: currentRotation.x,
+                        y: currentRotation.y,
+                        z: currentRotation.z
+                    },
+                    to: {
+                        x: currentRotation.x,
+                        y: currentRotation.y + 360,  // Adiciona 360° no eixo Y
+                        z: currentRotation.z
+                    },
+                    dur: 1500,          // Duração: 1.5 segundos
+                    easing: 'easeInOutCubic', // Animação suave
+                    loop: false         // Não repete
+                });
+            },
+            
+            // ========================================
+            // INTERAÇÃO 2: ARRASTAR (DRAG)
+            // Rotaciona o modelo manualmente
+            // ========================================
+            onDrag: function(evt) {
+                const deltaX = evt.detail.deltaX;  // Quanto arrastou em X
+                
+                // Calcula a diferença desde o último frame
+                const dragDelta = deltaX - this.lastDragX;
+                this.lastDragX = deltaX;
+                
+                // Rotaciona baseado no arrasto
+                const currentRotation = this.el.getAttribute('rotation');
+                const rotationSpeed = 0.5;  // Sensibilidade (quanto maior, mais sensível)
+                
+                // Aplica a rotação no eixo Y
+                this.el.setAttribute('rotation', {
+                    x: currentRotation.x,
+                    y: currentRotation.y + (dragDelta * rotationSpeed),
+                    z: currentRotation.z
+                });
+                
+                // Cancela o aumento de escala durante o arrasto
+                this.isPressed = false;
+                if (this.scaleInterval) {
+                    clearInterval(this.scaleInterval);
+                    this.scaleInterval = null;
+                }
+            },
+            
+            // ========================================
+            // INTERAÇÃO 3: PRESSIONAR E SEGURAR (PRESS)
+            // Aumenta gradualmente o tamanho
+            // ========================================
+            onPressStart: function(evt) {
+                console.log('✋ Pressionar iniciado - Aumentando tamanho');
+                this.isPressed = true;
+                
+                // Cria um intervalo que executa a cada 50ms
+                this.scaleInterval = setInterval(() => {
+                    // Só aumenta se ainda estiver pressionado e não atingiu o máximo
+                    if (this.isPressed && this.currentScale < this.data.scaleMax) {
+                        this.currentScale += 0.06;  // Aumenta 6% a cada 50ms
+                        
+                        // Limita ao máximo configurado
+                        if (this.currentScale > this.data.scaleMax) {
+                            this.currentScale = this.data.scaleMax;
+                        }
+                        
+                        // Aplica a nova escala
+                        this.el.object3D.scale.set(
+                            this.initialScale.x * this.currentScale,
+                            this.initialScale.y * this.currentScale,
+                            this.initialScale.z * this.currentScale
+                        );
+                    }
+                }, 50);  // Executa a cada 50 milissegundos
+            },
+            
+            // Quando o usuário para de pressionar
+            onPressEnd: function(evt) {
+                console.log('↩️ Pressionar finalizado - Voltando ao normal');
+                this.isPressed = false;
+                this.lastDragX = 0;  // Reseta o drag
+                
+                // Para o intervalo de aumento
+                if (this.scaleInterval) {
+                    clearInterval(this.scaleInterval);
+                    this.scaleInterval = null;
+                }
+                
+                // Retorna ao tamanho original com animação suave
+                this.el.setAttribute('animation__scaledown', {
+                    property: 'scale',
+                    to: {
+                        x: this.initialScale.x,
+                        y: this.initialScale.y,
+                        z: this.initialScale.z
+                    },
+                    dur: 500,           // Duração: 500ms
+                    easing: 'easeOutQuad',
+                    loop: false
+                });
+                
+                // Reseta o multiplicador de escala
+                this.currentScale = 1;
+            },
+            
+            // Limpeza quando o componente é removido
+            remove: function() {
+                const sceneEl = this.el.sceneEl;
+                sceneEl.removeEventListener('gesture-tap', this.onTap);
+                sceneEl.removeEventListener('gesture-pressstart', this.onPressStart);
+                sceneEl.removeEventListener('gesture-pressend', this.onPressEnd);
+                sceneEl.removeEventListener('gesture-drag', this.onDrag);
+                
+                if (this.scaleInterval) {
+                    clearInterval(this.scaleInterval);
+                }
+            }
+        });
+        
+        // ========================================
+        // MONITORAMENTO E BOTÃO DE FECHAR
+        // ========================================
+        
+        // Seleciona elementos da página
+        const scene = document.querySelector('a-scene');
+        const marker = document.getElementById('marker');
+        const model = document.getElementById('model');
+        const closeButton = document.getElementById('closeButton');
+        
+        // ========================================
+        // BOTÃO DE FECHAR
+        // ========================================
+        closeButton.addEventListener('click', function() {
+            // Pede confirmação antes de fechar
+            if (confirm('Deseja realmente sair do WebAR?')) {
+                // Para a câmera (libera recurso do sistema)
+                const video = document.querySelector('video');
+                if (video && video.srcObject) {
+                    const tracks = video.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                }
+                
+                // Tenta voltar para a página anterior
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    // Se não conseguir voltar, tenta fechar a aba
+                    window.close();
+                    
+                    // Se não conseguir fechar, mostra mensagem
+                    setTimeout(() => {
+                        document.body.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: Arial; flex-direction: column;"><h1>✓ WebAR Encerrado</h1><p>Você pode fechar esta aba agora.</p></div>';
+                    }, 100);
+                }
+            }
+        });
+        
+        // ========================================
+        // EVENTOS DE MONITORAMENTO
+        // ========================================
+        
+        // Quando a cena A-Frame termina de carregar
+        scene.addEventListener('loaded', function() {
+            console.log('✓ A-Frame carregado com sucesso');
+        });
+        
+        // Quando o marcador Hiro é detectado pela câmera
+        marker.addEventListener('markerFound', function() {
+            console.log('✓ Marcador Hiro detectado! Modelo visível');
+        });
+        
+        // Quando o marcador Hiro sai do campo de visão
+        marker.addEventListener('markerLost', function() {
+            console.log('⚠ Marcador perdido - aponte a câmera novamente');
+        });
+        
+        // Quando o modelo 3D termina de carregar
+        model.addEventListener('model-loaded', function() {
+            console.log('✓ Modelo Leon Kennedy carregado com sucesso!');
+        });
+        
+        // Se houver erro ao carregar o modelo
+        model.addEventListener('model-error', function(evt) {
+            console.error('✗ Erro ao carregar modelo:', evt);
+            alert('Erro: Verifique se o arquivo leon.glb está na mesma pasta do HTML');
+        });
+        
+        // ========================================
+        // OCULTAR INSTRUÇÕES AUTOMATICAMENTE
+        // ========================================
+        // Após 7 segundos, esconde as instruções gradualmente
+        setTimeout(() => {
+            const instructions = document.getElementById('instructions');
+            if (instructions) {
+                // Adiciona transição de opacidade
+                instructions.style.transition = 'opacity 1s';
+                instructions.style.opacity = '0';  // Fica invisível
+                
+                // Remove do DOM após a animação (1 segundo depois)
+                setTimeout(() => instructions.remove(), 1000);
+            }
+        }, 7000);  // 7000 milissegundos = 7 segundos
+        
+        console.log('✓ Sistema WebAR iniciado e pronto para uso!');
+    </script>
+</body>
+</html>
