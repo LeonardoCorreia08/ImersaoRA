@@ -9,11 +9,41 @@ Código criado para utilização junto ao curso de imersaoRA
 
 Imersão em Realidade Aumentada — explorando experiências interativas que conectam o mundo físico ao digital.
 
-Segue os projetos :
+Segue os projetos:
 
-[Leon](https://leon3dv2.netlify.app/)
+### [Leon](https://leon3dv2.netlify.app/)
+Projeto de Realidade Aumentada com modelo 3D do personagem Leon Kennedy.
 
-[Cloud](https://cloudff7.netlify.app/)
+### [Cloud](https://cloudff7.netlify.app/)
+Projeto de Realidade Aumentada com modelo 3D do personagem Cloud Strife.
+
+<p align="center">
+  <img src="./assets/Android.jpg" width="250" alt="Visualização Android">
+  <img src="./assets/ios.jpg" width="250" alt="Visualização iOS">
+  <img src="./assets/desktop.jpg" width="250" alt="Visualização Desktop">
+</p>
+
+---
+
+## Tecnologias Utilizadas
+
+- **A-Frame** (1.4.2) - Framework para experiências 3D/VR
+- **AR.js** (3.4.5) - Biblioteca de Realidade Aumentada
+- **A-Frame Extras** (6.1.1) - Componentes adicionais
+
+## Como Usar
+
+1. Acesse os links dos projetos pelo celular
+2. Permita o acesso à câmera
+3. Aponte para o marcador Hiro
+4. Interaja com os modelos 3D
+
+## Interações Disponíveis
+
+- **Toque rápido**: Anima e gira 360°
+- **Pressionar e segurar**: Aumenta tamanho
+- **Arrastar horizontalmente**: Gira manualmente
+
 
 # Realidade Aumentada (RA)
 
