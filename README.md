@@ -19,7 +19,7 @@ Projeto de Realidade Aumentada com modelo 3D do personagem Cloud Strife.
 
 <p align="center">
   <img src="./assets/Android.jpg" width="250" alt="Visualização Android">
-  <img src="./assets/ios.jpg" width="250" alt="Visualização iOS">
+  <img src="./assets/IOS.jpg" width="250" alt="Visualização iOS">
   <img src="./assets/desktop.jpg" width="250" alt="Visualização Desktop">
 </p>
 
