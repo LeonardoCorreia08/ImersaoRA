@@ -17,12 +17,25 @@ Projeto de Realidade Aumentada com modelo 3D do personagem Leon Kennedy.
 ### [Cloud](https://cloudff7.netlify.app/)
 Projeto de Realidade Aumentada com modelo 3D do personagem Cloud Strife.
 
-<p align="center">
-  <img src="./assets/Android.jpg" width="250" alt="Visualização Android">
-  <img src="./assets/IOS.jpg" width="250" alt="Visualização iOS">
-  <img src="./assets/desktop.jpg" width="250" alt="Visualização Desktop">
-</p>
-
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="./assets/Android.jpg" width="250" alt="Android"/>
+      <br/>
+      <b>Android</b>
+    </td>
+    <td align="center">
+      <img src="./assets/IOS.jpg" width="250" alt="iOS"/>
+      <br/>
+      <b>iOS</b>
+    </td>
+    <td align="center">
+      <img src="./assets/desktop.jpg" width="250" alt="Desktop"/>
+      <br/>
+      <b>Desktop</b>
+    </td>
+  </tr>
+</table>
 ---
 
 ## Tecnologias Utilizadas
