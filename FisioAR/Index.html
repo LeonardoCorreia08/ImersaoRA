@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f766e">
+<title>FisioAR • Realidade Aumentada em Fisioterapia</title>
+<meta name="description" content="Catálogo de exercícios de fisioterapia com AR — visualize no seu espaço, favoritos e histórico de treinos.">
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+
+<!-- AR no dispositivo (preview 3D nos cards + AR nativo) -->
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<!-- AR por marcador (A-Frame + AR.js) -->
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.7/aframe/build/aframe-ar.js"></script>
+
+<style>
+  /* ===== Tema Teal/Verde-Azulado (Saúde & Bem-estar) ===== */
+  :root{
+    --bg:#0a0e12; --bg-2:#0f1419; --paper:#141d26;
+    --text:#e8f4f8; --muted:#8fa9b8;
+    --brand:#0d9488; --brand-2:#14b8a6; --brand-light:#5eead4;
+    --radius:12px; --shadow:0 8px 20px rgba(0,0,0,.32);
+    --border:1px solid rgba(255,255,255,.06);
+    --ok:#10b981; --warn:#f59e0b; --err:#ef4444;
+    --focus: 0 0 0 3px rgba(13,148,136,.3);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Roboto,system-ui,Arial,sans-serif;line-height:1.5}
+  a{color:var(--brand-light);text-decoration:none}
+  a:hover{text-decoration:underline}
+  :focus-visible{outline:none; box-shadow:var(--focus)}
+  @media (prefers-reduced-motion: reduce){*{animation:none !important; transition:none !important}}
+
+  /* ===== LAYOUT: Sidebar + Main ===== */
+  body{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+  @media (max-width:768px){body{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
+
+  /* ===== SIDEBAR ===== */
+  .sidebar{background:linear-gradient(135deg, rgba(15,20,25,.95) 0%, rgba(20,30,40,.95) 100%);border-right:var(--border);padding:1.5rem 1rem;display:flex;flex-direction:column;gap:1.5rem;position:sticky;top:0;height:100vh;overflow-y:auto}
+  @media (max-width:768px){
+    .sidebar{grid-column:1;grid-row:1;height:auto;border-right:none;border-bottom:var(--border);padding:1rem;flex-direction:row;align-items:center;justify-content:space-between;overflow-x:auto}
+  }
+
+  .logo{font-size:1.4rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:.5rem;letter-spacing:-.5px}
+  .logo .icon{font-size:1.8rem}
+  .logo b{color:var(--brand-light)}
+
+  .nav-section{display:flex;flex-direction:column;gap:.8rem}
+  .nav-section-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem}
+
+  .nav-btn{display:flex;align-items:center;gap:.6rem;padding:.7rem .8rem;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--text);cursor:pointer;font-size:.95rem;transition:all .2s ease;text-align:left;width:100%;font-weight:500}
+  .nav-btn:hover{background:rgba(13,148,136,.12);border-color:rgba(13,148,136,.2)}
+  .nav-btn.active{background:rgba(13,148,136,.2);border-color:var(--brand);color:var(--brand-light)}
+  .nav-btn .icon{font-size:1.2rem;min-width:24px}
+
+  @media (max-width:768px){
+    .sidebar{flex-direction:row;gap:.5rem}
+    .nav-section{flex-direction:row;gap:.3rem}
+    .nav-section-title{display:none}
+    .nav-btn{padding:.5rem .6rem;font-size:.85rem;gap:.3rem}
+    .nav-btn .label{display:none}
+  }
+
+  /* ===== MAIN CONTENT ===== */
+  .main{grid-column:2;grid-row:1;overflow-y:auto;background:var(--bg)}
+  @media (max-width:768px){.main{grid-column:1;grid-row:2}}
+
+  .header{background:linear-gradient(135deg, rgba(13,148,136,.1) 0%, rgba(20,184,166,.05) 100%);border-bottom:var(--border);padding:2rem 2rem;position:sticky;top:0;z-index:50}
+  @media (max-width:768px){.header{padding:1.5rem 1rem}}
+
+  .header h1{margin:0;font-size:2rem;font-weight:700;background:linear-gradient(135deg, var(--text) 0%, var(--brand-light) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .header p{margin:.5rem 0 0;color:var(--muted);font-size:.95rem}
+
+  /* ===== CONTENT SECTIONS ===== */
+  .content{padding:2rem;display:none}
+  .content.active{display:block;animation:fadeIn .3s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @media (max-width:768px){.content{padding:1.5rem 1rem}}
+
+  /* ===== FILTROS ===== */
+  .filters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:2rem}
+  @media (max-width:1024px){.filters{grid-template-columns:1fr 1fr}}
+  @media (max-width:640px){.filters{grid-template-columns:1fr}}
+
+  input,select{background:#111a24;border:var(--border);color:var(--text);padding:.6rem .8rem;border-radius:10px;font-size:.95rem;transition:all .2s ease;width:100%}
+  input:focus,select:focus{background:#1a2635;border-color:var(--brand);outline:none;box-shadow:0 0 0 2px rgba(13,148,136,.15)}
+  input::placeholder{color:#6b7f8f}
+
+  /* ===== GRID DE EXERCÍCIOS ===== */
+  .exercises-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:1.5rem}
+  @media (max-width:768px){.exercises-grid{grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:1rem}}
+  @media (max-width:480px){.exercises-grid{grid-template-columns:1fr}}
+
+  /* ===== EXERCISE CARD - Design único ===== */
+  .exercise-card{background:var(--paper);border:var(--border);border-radius:var(--radius);overflow:hidden;transition:all .3s ease;display:flex;flex-direction:column;position:relative;height:100%}
+  .exercise-card:hover{transform:translateY(-6px);border-color:rgba(13,148,136,.4);box-shadow:0 16px 32px rgba(13,148,136,.2)}
+
+  .card-header{position:relative;height:200px;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .card-header model-viewer{width:100%;height:100%}
+
+  .card-badge{position:absolute;top:10px;right:10px;display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end}
+  .badge{font-size:.7rem;padding:.3rem .6rem;border-radius:20px;font-weight:600;border:1px solid rgba(255,255,255,.2)}
+  .badge.dif-ini{background:rgba(16,185,129,.2);color:#10b981;border-color:rgba(16,185,129,.4)}
+  .badge.dif-int{background:rgba(251,191,36,.2);color:#f59e0b;border-color:rgba(251,191,36,.4)}
+  .badge.dif-ava{background:rgba(239,77,109,.2);color:#ef4d6d;border-color:rgba(239,77,109,.4)}
+
+  .card-content{padding:1.2rem;display:flex;flex-direction:column;gap:.8rem;flex:1}
+
+  .card-title{font-size:1.1rem;font-weight:700;color:var(--text);margin:0}
+  .card-desc{font-size:.85rem;color:var(--muted);line-height:1.5;margin:0}
+  .card-meta{display:flex;gap:.8rem;font-size:.8rem;color:var(--muted);flex-wrap:wrap}
+  .card-meta span{display:flex;align-items:center;gap:.3rem}
+
+  .card-actions{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:auto}
+  .btn{padding:.5rem .8rem;border-radius:8px;border:var(--border);background:#1a2635;color:var(--text);cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s ease;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;white-space:nowrap}
+  .btn:hover{background:#22303d;border-color:rgba(13,148,136,.3)}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  .btn.primary:hover{background:var(--brand-2);border-color:var(--brand-2)}
+  .btn.ghost{background:transparent;border:none}
+  .btn.ghost:hover{background:rgba(13,148,136,.1)}
+  .btn.fav{padding:.4rem;width:40px;height:40px}
+
+  /* ===== OVERLAYS ===== */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;place-items:center;z-index:100;padding:1rem}
+  .overlay.active{display:grid}
+  .sheet{width:min(1100px,96vw);height:min(88vh,900px);background:var(--bg-2);border:var(--border);border-radius:14px;overflow:hidden;display:grid;grid-template-rows:auto 1fr auto}
+  @media (max-width:640px){.sheet{height:calc(92vh - env(safe-area-inset-bottom))}}
+
+  .toolbar{display:flex;gap:.5rem;align-items:center;justify-content:space-between;padding:.8rem 1rem;border-bottom:var(--border)}
+  .controls{display:flex;gap:.5rem;align-items:center;padding:.8rem 1rem;border-top:var(--border);flex-wrap:wrap}
+  .mv{width:100%;height:100%;background:#000}
+
+  /* ===== LISTAS (Favoritos, Histórico) ===== */
+  .list-container{padding:1rem;display:grid;gap:.8rem;overflow-y:auto}
+  .list-item{display:grid;grid-template-columns:1fr auto;gap:1rem;background:var(--paper);border:var(--border);border-radius:10px;padding:1rem;transition:all .2s ease;align-items:start}
+  .list-item:hover{border-color:rgba(13,148,136,.3);background:#22303d}
+  .list-item-info h3{margin:0 0 .3rem;font-size:.95rem;color:var(--text)}
+  .list-item-info p{margin:0;font-size:.85rem;color:var(--muted)}
+  .list-item-actions{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end}
+
+  /* ===== EMPTY STATE ===== */
+  .empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
+  .empty-state-icon{font-size:3rem;margin-bottom:1rem}
+  .empty-state p{margin:0;font-size:.95rem}
+
+  /* ===== STATS CARDS ===== */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:1.5rem;margin-bottom:2rem}
+  .stat-card{background:var(--paper);border:var(--border);border-radius:var(--radius);padding:1.5rem;display:flex;flex-direction:column;gap:.8rem}
+  .stat-card:hover{border-color:rgba(13,148,136,.3);box-shadow:0 8px 16px rgba(13,148,136,.1)}
+  .stat-label{font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  .stat-value{font-size:2.5rem;font-weight:700;color:var(--brand-light)}
+  .stat-change{font-size:.8rem;color:var(--ok);display:flex;align-items:center;gap:.3rem}
+
+  /* ===== CHARTS ===== */
+  .charts-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:1.5rem;margin-bottom:2rem}
+  .chart-card{background:var(--paper);border:var(--border);border-radius:var(--radius);padding:1.5rem}
+  .chart-title{font-size:1rem;font-weight:700;color:var(--text);margin:0 0 1rem}
+  .chart-container{width:100%;height:300px;display:flex;align-items:flex-end;gap:.5rem;justify-content:space-around}
+  .chart-bar{flex:1;background:linear-gradient(180deg, var(--brand-light) 0%, var(--brand) 100%);border-radius:8px 8px 0 0;position:relative;min-height:20px;transition:all .3s ease;cursor:pointer}
+  .chart-bar:hover{opacity:.8;transform:scaleY(1.05)}
+  .chart-bar-label{position:absolute;bottom:-25px;left:50%;transform:translateX(-50%);font-size:.75rem;color:var(--muted);white-space:nowrap}
+  .chart-bar-value{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:.8rem;font-weight:600;color:var(--brand-light)}
+
+  /* ===== HEATMAP ===== */
+  .heatmap-grid{display:grid;grid-template-columns:repeat(7, 1fr);gap:.5rem;margin-top:1rem}
+  .heatmap-cell{aspect-ratio:1;border-radius:6px;background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.2);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--muted);transition:all .2s ease}
+  .heatmap-cell:hover{transform:scale(1.1);box-shadow:0 4px 12px rgba(13,148,136,.2)}
+  .heatmap-cell.active-0{background:rgba(13,148,136,.15)}
+  .heatmap-cell.active-1{background:rgba(13,148,136,.3)}
+  .heatmap-cell.active-2{background:rgba(13,148,136,.5)}
+  .heatmap-cell.active-3{background:var(--brand);color:var(--text)}
+
+  /* ===== TOP EXERCISES ===== */
+  .top-exercises{display:grid;gap:.8rem}
+  .exercise-row{display:grid;grid-template-columns:1fr auto auto;gap:1rem;align-items:center;background:var(--paper);border:var(--border);border-radius:10px;padding:1rem;transition:all .2s ease}
+  .exercise-row:hover{border-color:rgba(13,148,136,.3);background:#22303d}
+  .exercise-name{font-weight:600;color:var(--text)}
+  .exercise-count{font-size:.9rem;color:var(--muted)}
+  .progress-bar{width:100px;height:6px;background:rgba(13,148,136,.2);border-radius:3px;overflow:hidden}
+  .progress-fill{height:100%;background:linear-gradient(90deg, var(--brand) 0%, var(--brand-light) 100%);border-radius:3px}
+
+  /* ===== FOOTER ===== */
+  footer{padding:1.5rem 2rem;border-top:var(--border);text-align:center;color:var(--muted);font-size:.85rem}
+  @media (max-width:768px){footer{padding:1rem}}
+
+  /* ===== SCROLLBAR ===== */
+  ::-webkit-scrollbar{width:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(13,148,136,.3);border-radius:4px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(13,148,136,.5)}
+</style>
+</head>
+<body>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="icon">💪</span>
+      <div><b>Fisio</b>AR</div>
+    </div>
+
+    <nav class="nav-section">
+      <div class="nav-section-title">Menu</div>
+      <button class="nav-btn active" data-section="catalog">
+        <span class="icon">📋</span>
+        <span class="label">Catálogo</span>
+      </button>
+      <button class="nav-btn" data-section="favorites">
+        <span class="icon">❤️</span>
+        <span class="label">Favoritos</span>
+      </button>
+      <button class="nav-btn" data-section="history">
+        <span class="icon">📜</span>
+        <span class="label">Histórico</span>
+      </button>
+    </nav>
+
+    <nav class="nav-section" style="margin-top:auto">
+      <div class="nav-section-title">Info</div>
+      <button class="nav-btn" data-section="about">
+        <span class="icon">ℹ️</span>
+        <span class="label">Sobre</span>
+      </button>
+    </nav>
+
+    <nav class="nav-section" style="border-top:var(--border);padding-top:1rem">
+      <div class="nav-section-title">Analytics</div>
+      <button class="nav-btn" data-section="progress">
+        <span class="icon">📊</span>
+        <span class="label">Progresso</span>
+      </button>
+    </nav>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <!-- HEADER -->
+    <div class="header">
+      <h1 id="sectionTitle">Catálogo de Exercícios</h1>
+      <p id="sectionDesc">Explore exercícios de fisioterapia em Realidade Aumentada</p>
+    </div>
+
+    <!-- CATALOG SECTION -->
+    <section class="content active" id="catalog">
+      <div class="filters">
+        <input id="q" placeholder="Buscar exercício…" aria-label="Busca"/>
+        <select id="dificuldade" aria-label="Dificuldade">
+          <option value="">Todas dificuldades</option><option>Iniciante</option><option>Intermediário</option><option>Avançado</option>
+        </select>
+        <select id="grupo" aria-label="Grupo muscular">
+          <option value="">Todos grupos</option><option>Pernas</option><option>Abdômen</option><option>Braços</option><option>Corpo inteiro</option>
+        </select>
+      </div>
+      <div id="catalogGrid" class="exercises-grid"></div>
+    </section>
+
+    <!-- FAVORITES SECTION -->
+    <section class="content" id="favorites">
+      <div id="favList" class="list-container"></div>
+    </section>
+
+    <!-- HISTORY SECTION -->
+    <section class="content" id="history">
+      <div id="histList" class="list-container"></div>
+    </section>
+
+    <!-- PROGRESS SECTION -->
+    <section class="content" id="progress">
+      <div style="max-width:1400px;margin:0 auto">
+        <!-- STATS CARDS -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total de Exercícios</div>
+            <div class="stat-value" id="totalExercises">0</div>
+            <div class="stat-change">📈 Completos</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Favoritos</div>
+            <div class="stat-value" id="totalFavorites">0</div>
+            <div class="stat-change">❤️ Marcados</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Dias Ativos</div>
+            <div class="stat-value" id="activeDays">0</div>
+            <div class="stat-change">🔥 Sequência</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Tempo Total</div>
+            <div class="stat-value" id="totalTime">0h</div>
+            <div class="stat-change">⏱️ Dedicado</div>
+          </div>
+        </div>
+
+        <!-- CHARTS -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <h3 class="chart-title">Exercícios por Dificuldade</h3>
+            <div class="chart-container" id="difficultyChart"></div>
+          </div>
+          <div class="chart-card">
+            <h3 class="chart-title">Exercícios por Grupo Muscular</h3>
+            <div class="chart-container" id="groupChart"></div>
+          </div>
+        </div>
+
+        <!-- HEATMAP -->
+        <div class="chart-card">
+          <h3 class="chart-title">Atividade Semanal (Últimos 7 dias)</h3>
+          <div class="heatmap-grid" id="heatmap"></div>
+        </div>
+
+        <!-- TOP EXERCISES -->
+        <div class="chart-card" style="margin-top:1.5rem">
+          <h3 class="chart-title">Exercícios Mais Visualizados</h3>
+          <div class="top-exercises" id="topExercises"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT SECTION -->
+    <section class="content" id="about">
+      <div style="max-width:800px;margin:0 auto">
+        <h2 style="color:var(--brand-light);margin-top:0">Sobre FisioAR</h2>
+        <p style="color:var(--muted);line-height:1.8">FisioAR é uma aplicação inovadora de Realidade Aumentada desenvolvida para auxiliar profissionais e pacientes de fisioterapia na visualização e execução de exercícios com precisão anatômica.</p>
+        
+        <h3 style="color:var(--brand-light);margin-top:2rem">Recursos</h3>
+        <ul style="color:var(--muted);line-height:1.8">
+          <li>✓ Visualização 3D de 13 exercícios diferentes</li>
+          <li>✓ Realidade Aumentada para visualizar no seu espaço</li>
+          <li>✓ Favoritos e histórico de treinos</li>
+          <li>✓ Informações detalhadas de cada exercício</li>
+          <li>✓ Classificação por dificuldade e grupo muscular</li>
+          <li>✓ Interface responsiva e intuitiva</li>
+        </ul>
+
+        <h3 style="color:var(--brand-light);margin-top:2rem">Como Usar</h3>
+        <ol style="color:var(--muted);line-height:1.8">
+          <li>Navegue pelo catálogo de exercícios</li>
+          <li>Clique em "Visualizar" para ver o modelo 3D</li>
+          <li>Use "AR" para visualizar no seu espaço com câmera</li>
+          <li>Adicione aos favoritos para acesso rápido</li>
+          <li>Consulte detalhes técnicos de cada movimento</li>
+        </ol>
+
+        <h3 style="color:var(--brand-light);margin-top:2rem">Disclaimer</h3>
+        <p style="font-size:.9rem;color:#f59e0b;background:rgba(245,158,11,.1);padding:1rem;border-radius:10px;border-left:3px solid #f59e0b">
+          ⚠️ Este aplicativo é apenas para fins educacionais e de demonstração. Consulte sempre um profissional de saúde qualificado antes de iniciar qualquer programa de exercícios.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <p>FisioAR © 2025 • Realidade Aumentada para Fisioterapia</p>
+    </footer>
+  </main>
+
+  <!-- OVERLAY: DETALHES -->
+  <div class="overlay" id="detailsOverlay">
+    <div class="sheet" role="dialog" aria-labelledby="detTitle">
+      <div class="toolbar">
+        <strong id="detTitle">Detalhes do Exercício</strong>
+        <button class="btn ghost" id="closeDetails" aria-label="Fechar">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1rem;padding:1rem;overflow:auto">
+        <div style="background:#000;border-radius:10px;overflow:hidden;border:var(--border)">
+          <model-viewer id="detMV" src="" alt="Visualizador 3D" camera-controls auto-rotate shadow-intensity="1" style="width:100%;height:100%;min-height:400px"></model-viewer>
+        </div>
+        <div style="display:grid;gap:1rem;align-content:start">
+          <div id="detFaq" style="display:grid;gap:.6rem"></div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn primary" id="detAR" style="flex:1">🔍 Abrir AR</button>
+            <a class="btn" id="detSketch" href="#" target="_blank" rel="noopener noreferrer" style="display:none;flex:1">🎨 Ver modelo</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAY: AR DISPOSITIVO -->
+  <div class="overlay" id="mvOverlay">
+    <div class="sheet" role="dialog" aria-labelledby="mvTitle">
+      <div class="toolbar">
+        <strong id="mvTitle">Visualizador 3D</strong>
+        <button class="btn ghost" id="closeMV" aria-label="Fechar">✕</button>
+      </div>
+      <model-viewer id="mv" class="mv" src="" alt="Visualizador 3D" ar ar-modes="scene-viewer quick-look webxr" ar-placement="floor" camera-controls auto-rotate shadow-intensity="1"></model-viewer>
+      <div class="controls">
+        <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn" id="mvAR">🔍 Abrir AR</button>
+          <button class="btn ghost" id="mvReset">↻ Resetar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAY: AR MARCADOR -->
+  <div class="overlay" id="arOverlay">
+    <div class="sheet" role="dialog" aria-labelledby="arTitle">
+      <div class="toolbar">
+        <strong id="arTitle">AR (Marcador)</strong>
+        <button class="btn ghost" id="closeAR" aria-label="Fechar">✕</button>
+      </div>
+      <div id="arMount" style="width:100%;height:100%;background:#000;position:relative"></div>
+      <div class="controls">
+        <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn" id="rotL">⬅️ Girar</button>
+          <button class="btn" id="rotR">➡️ Girar</button>
+          <button class="btn" id="scalePlus">🔍+ Zoom</button>
+          <button class="btn" id="scaleMinus">🔍- Zoom</button>
+          <button class="btn" id="snapshotBtn">📸 Capturar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ===========================
+       DADOS DO CATÁLOGO
+    =========================== */
+    const CATALOG = [
+      {
+        id: 'back-squat',
+        nome: 'Back Squat',
+        dificuldade: 'Intermediário',
+        grupo: 'Pernas',
+        desc: 'Agachamento com barra nas costas. Excelente para fortalecer pernas e glúteos.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/LittlestTokyo.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 12,
+        descanso: '90s'
+      },
+      {
+        id: 'bicycle-crunch',
+        nome: 'Bicycle Crunch',
+        dificuldade: 'Iniciante',
+        grupo: 'Abdômen',
+        desc: 'Movimento de bicicleta deitado. Trabalha abdômen e oblíquos.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Duck.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 20,
+        descanso: '60s'
+      },
+      {
+        id: 'burpee',
+        nome: 'Burpee',
+        dificuldade: 'Avançado',
+        grupo: 'Corpo inteiro',
+        desc: 'Exercício explosivo de corpo inteiro. Combina força e resistência cardiovascular.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Parrot.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 10,
+        descanso: '120s'
+      },
+      {
+        id: 'jumping-jacks',
+        nome: 'Jumping Jacks',
+        dificuldade: 'Iniciante',
+        grupo: 'Corpo inteiro',
+        desc: 'Pulo com abertura de pernas e braços. Aquecimento e cardio.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Flamingo.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 30,
+        descanso: '45s'
+      },
+      {
+        id: 'kettlebell-swing',
+        nome: 'Kettlebell Swing',
+        dificuldade: 'Intermediário',
+        grupo: 'Pernas',
+        desc: 'Balanço de kettlebell. Trabalha pernas, glúteos e costas.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Horse.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 15,
+        descanso: '90s'
+      },
+      {
+        id: 'overhead-squat',
+        nome: 'Overhead Squat',
+        dificuldade: 'Avançado',
+        grupo: 'Pernas',
+        desc: 'Agachamento com barra elevada. Requer mobilidade e estabilidade.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Stork.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 8,
+        descanso: '120s'
+      },
+      {
+        id: 'pike-walk',
+        nome: 'Pike Walk',
+        dificuldade: 'Intermediário',
+        grupo: 'Abdômen',
+        desc: 'Caminhada em posição de pico. Trabalha abdômen e estabilidade.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Xbot.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 12,
+        descanso: '60s'
+      },
+      {
+        id: 'pistol',
+        nome: 'Pistol',
+        dificuldade: 'Avançado',
+        grupo: 'Pernas',
+        desc: 'Agachamento unilateral. Excelente para força e equilíbrio.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Maruska.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 6,
+        descanso: '120s'
+      },
+      {
+        id: 'plank',
+        nome: 'Plank',
+        dificuldade: 'Iniciante',
+        grupo: 'Abdômen',
+        desc: 'Prancha isométrica. Fortalece core e estabilidade.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/CesiumMan.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: '45s',
+        descanso: '60s'
+      },
+      {
+        id: 'push-up',
+        nome: 'Push Up',
+        dificuldade: 'Iniciante',
+        grupo: 'Braços',
+        desc: 'Flexão de braço. Trabalha peito, ombros e tríceps.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Morphing.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 15,
+        descanso: '60s'
+      },
+      {
+        id: 'quick-steps',
+        nome: 'Quick Steps',
+        dificuldade: 'Iniciante',
+        grupo: 'Corpo inteiro',
+        desc: 'Passos rápidos no lugar. Aquecimento e cardio.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/BrainStem.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: '60s',
+        descanso: '45s'
+      },
+      {
+        id: 'situps',
+        nome: 'Situps',
+        dificuldade: 'Iniciante',
+        grupo: 'Abdômen',
+        desc: 'Abdominal dinâmico. Trabalha reto abdominal.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/Avocado.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 20,
+        descanso: '60s'
+      },
+      {
+        id: 'start-bicycle-situp',
+        nome: 'Start Bicycle Sit Up',
+        dificuldade: 'Intermediário',
+        grupo: 'Abdômen',
+        desc: 'Abdominal com movimento de bicicleta. Trabalha abdômen e oblíquos.',
+        urlGLB: 'https://cdn.jsdelivr.net/npm/three@r128/examples/models/gltf/IridescentDishWithOlives.glb',
+        urlSketchfab: 'https://sketchfab.com',
+        series: 3,
+        repeticoes: 15,
+        descanso: '60s'
+      }
+    ];
+
+    const DETAILS = {
+      'back-squat': [
+        { t: 'Técnica', d: 'Mantenha o peito ereto, joelhos alinhados com os pés. Desça até 90° e retorne.' },
+        { t: 'Benefícios', d: 'Fortalece pernas, glúteos e core. Melhora mobilidade de quadril.' },
+        { t: 'Precauções', d: 'Evite joelhos caindo para dentro. Consulte um fisioterapeuta se tiver dúvidas.' }
+      ],
+      'bicycle-crunch': [
+        { t: 'Técnica', d: 'Deitado, leve o cotovelo direito ao joelho esquerdo enquanto estende a perna direita.' },
+        { t: 'Benefícios', d: 'Trabalha reto abdominal e oblíquos. Melhora flexibilidade.' },
+        { t: 'Precauções', d: 'Não force o pescoço. Mantenha o movimento controlado.' }
+      ],
+      'burpee': [
+        { t: 'Técnica', d: 'De pé, agache, coloque as mãos no chão, pule para trás, faça uma flexão, retorne.' },
+        { t: 'Benefícios', d: 'Exercício completo que trabalha força e resistência cardiovascular.' },
+        { t: 'Precauções', d: 'Não recomendado para iniciantes sem preparação. Adapte conforme necessário.' }
+      ],
+      'jumping-jacks': [
+        { t: 'Técnica', d: 'De pé, pule enquanto abre as pernas e levanta os braços acima da cabeça.' },
+        { t: 'Benefícios', d: 'Aquecimento eficaz, melhora resistência cardiovascular.' },
+        { t: 'Precauções', d: 'Evite se tiver problemas nas articulações. Faça em superfície macia.' }
+      ],
+      'kettlebell-swing': [
+        { t: 'Técnica', d: 'Com pés afastados, balance o kettlebell entre as pernas e projete os quadris.' },
+        { t: 'Benefícios', d: 'Fortalece posterior da coxa, glúteos e costas. Melhora potência.' },
+        { t: 'Precauções', d: 'Mantenha as costas retas. Não use peso excessivo no início.' }
+      ],
+      'overhead-squat': [
+        { t: 'Técnica', d: 'Com barra elevada acima da cabeça, agache mantendo a barra estável.' },
+        { t: 'Benefícios', d: 'Trabalha mobilidade, estabilidade e força de pernas.' },
+        { t: 'Precauções', d: 'Requer mobilidade de ombro. Comece com peso leve.' }
+      ],
+      'pike-walk': [
+        { t: 'Técnica', d: 'Em posição de pico (V invertido), caminhe com as mãos para frente e para trás.' },
+        { t: 'Benefícios', d: 'Fortalece abdômen, ombros e estabilidade do core.' },
+        { t: 'Precauções', d: 'Mantenha o core contraído. Evite se tiver problemas de ombro.' }
+      ],
+      'pistol': [
+        { t: 'Técnica', d: 'De pé em uma perna, agache mantendo a outra perna estendida à frente.' },
+        { t: 'Benefícios', d: 'Trabalha força unilateral, equilíbrio e mobilidade de quadril.' },
+        { t: 'Precauções', d: 'Exercício avançado. Pratique com apoio antes de fazer sem ajuda.' }
+      ],
+      'plank': [
+        { t: 'Técnica', d: 'Apoiado nos antebraços e ponta dos pés, mantenha o corpo em linha reta.' },
+        { t: 'Benefícios', d: 'Fortalece core, abdômen e estabilidade geral do corpo.' },
+        { t: 'Precauções', d: 'Não deixe as costas caírem. Respire constantemente.' }
+      ],
+      'push-up': [
+        { t: 'Técnica', d: 'Com mãos no chão, abaixe o corpo até o peito tocar o chão e retorne.' },
+        { t: 'Benefícios', d: 'Fortalece peito, ombros, tríceps e core.' },
+        { t: 'Precauções', d: 'Mantenha o corpo reto. Adapte com joelhos se necessário.' }
+      ],
+      'quick-steps': [
+        { t: 'Técnica', d: 'Fique de pé e faça passos rápidos no lugar, levantando os joelhos.' },
+        { t: 'Benefícios', d: 'Aquecimento eficaz, melhora resistência cardiovascular.' },
+        { t: 'Precauções', d: 'Mantenha a postura ereta. Faça em superfície macia.' }
+      ],
+      'situps': [
+        { t: 'Técnica', d: 'Deitado com joelhos flexionados, levante o tronco até sentar.' },
+        { t: 'Benefícios', d: 'Fortalece reto abdominal e flexores de quadril.' },
+        { t: 'Precauções', d: 'Não force o pescoço. Mantenha o movimento controlado.' }
+      ],
+      'start-bicycle-situp': [
+        { t: 'Técnica', d: 'Combine abdominal com movimento de bicicleta para maior intensidade.' },
+        { t: 'Benefícios', d: 'Trabalha abdômen, oblíquos e flexibilidade.' },
+        { t: 'Precauções', d: 'Controle o movimento. Não force o pescoço.' }
+      ]
+    };
+
+    /* ===========================
+       UTILITÁRIOS
+    =========================== */
+    const qs = (s) => document.querySelector(s);
+    const qsa = (s) => document.querySelectorAll(s);
+
+    let favs = new Set(JSON.parse(localStorage.getItem('fisioar_favs') || '[]'));
+    let history = JSON.parse(localStorage.getItem('fisioar_history') || '[]');
+    let detCurrent = null;
+
+    /* ===========================
+       NAVEGAÇÃO ENTRE SEÇÕES
+    =========================== */
+    const sectionTitles = {
+      catalog: { title: 'Catálogo de Exercícios', desc: 'Explore exercícios de fisioterapia em Realidade Aumentada' },
+      favorites: { title: 'Exercícios Favoritos', desc: 'Seus exercícios marcados como favoritos' },
+      history: { title: 'Histórico de Visualizações', desc: 'Exercícios que você já visualizou' },
+      progress: { title: 'Progresso do Usuário', desc: 'Estatísticas e gráficos de uso' },
+      about: { title: 'Sobre FisioAR', desc: 'Informações sobre a aplicação' }
+    };
+
+    qsa('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const section = btn.dataset.section;
+        
+        // Atualizar header
+        qs('#sectionTitle').textContent = sectionTitles[section].title;
+        qs('#sectionDesc').textContent = sectionTitles[section].desc;
+
+        // Atualizar nav ativa
+        qsa('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Mostrar seção
+        qsa('.content').forEach(c => c.classList.remove('active'));
+        qs('#' + section).classList.add('active');
+
+        // Renderizar conteúdo
+        if(section === 'catalog') renderCatalog();
+        else if(section === 'favorites') renderFavs();
+        else if(section === 'history') renderHistory();
+        else if(section === 'progress') renderProgress();
+      });
+    });
+
+    /* ===========================
+       RENDERIZAR CATÁLOGO
+    =========================== */
+    function getDifficultyBadge(dif) {
+      if(dif === 'Iniciante') return 'dif-ini';
+      if(dif === 'Intermediário') return 'dif-int';
+      return 'dif-ava';
+    }
+
+    function renderCatalog(items = CATALOG) {
+      const grid = qs('#catalogGrid');
+      grid.innerHTML = '';
+      items.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'exercise-card';
+        card.innerHTML = `
+          <div class="card-header">
+            <model-viewer src="${p.urlGLB}" alt="${p.nome}" camera-controls auto-rotate shadow-intensity="1" style="width:100%;height:100%"></model-viewer>
+            <div class="card-badge">
+              <span class="badge ${getDifficultyBadge(p.dificuldade)}">${p.dificuldade}</span>
+              <span class="badge" style="background:rgba(94,234,212,.15);color:var(--brand-light);border-color:rgba(94,234,212,.3)">${p.grupo}</span>
+            </div>
+          </div>
+          <div class="card-content">
+            <h3 class="card-title">${p.nome}</h3>
+            <p class="card-desc">${p.desc}</p>
+            <div class="card-meta">
+              <span>📊 ${p.series}x${p.repeticoes}</span>
+              <span>⏱️ ${p.descanso}</span>
+            </div>
+            <div class="card-actions">
+              <button class="btn primary" data-details="${p.id}">Detalhes</button>
+              <button class="btn" data-mv="${p.id}">Visualizar</button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      // Event listeners
+      qsa('[data-details]').forEach(btn => {
+        btn.onclick = () => openDetails(btn.dataset.details);
+      });
+      qsa('[data-mv]').forEach(btn => {
+        btn.onclick = () => openMV(btn.dataset.mv);
+      });
+    }
+
+    renderCatalog();
+
+    /* ===========================
+       FILTROS
+    =========================== */
+    qs('#q').addEventListener('input', e => {
+      const q = e.target.value.toLowerCase();
+      const filtered = CATALOG.filter(p => p.nome.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q));
+      renderCatalog(filtered);
+    });
+
+    qs('#dificuldade').addEventListener('change', e => {
+      const d = e.target.value;
+      const filtered = d ? CATALOG.filter(p => p.dificuldade === d) : CATALOG;
+      renderCatalog(filtered);
+    });
+
+    qs('#grupo').addEventListener('change', e => {
+      const g = e.target.value;
+      const filtered = g ? CATALOG.filter(p => p.grupo === g) : CATALOG;
+      renderCatalog(filtered);
+    });
+
+    /* ===========================
+       VISUALIZADOR 3D
+    =========================== */
+    function openMV(id) {
+      const p = CATALOG.find(x => x.id === id);
+      if(!p) return;
+      
+      // Adicionar ao histórico
+      if(!history.find(x => x.id === id)) {
+        history.push({ id, nome: p.nome, timestamp: new Date().toLocaleString() });
+        if(history.length > 20) history.shift();
+        localStorage.setItem('fisioar_history', JSON.stringify(history));
+      }
+
+      qs('#mvTitle').textContent = p.nome;
+      qs('#mv').setAttribute('src', p.urlGLB);
+      qs('#mvOverlay').classList.add('active');
+    }
+
+    qs('#closeMV').onclick = () => qs('#mvOverlay').classList.remove('active');
+    qs('#mvAR').onclick = () => { if(qs('#mv').activateAR) qs('#mv').activateAR(); };
+    qs('#mvReset').onclick = () => qs('#mv').resetTurntable();
+
+    /* ===========================
+       DETALHES
+    =========================== */
+    function buildFAQ(secs) {
+      const faqContainer = qs('#detFaq');
+      faqContainer.innerHTML = '';
+      secs.forEach((s, i) => {
+        const item = document.createElement('div');
+        item.style.cssText = 'background:var(--paper);border:var(--border);border-radius:10px;overflow:hidden';
+        const id = 'faq-' + Math.random().toString(36).substr(2, 9);
+        item.innerHTML = `
+          <button style="width:100%;padding:.8rem 1rem;background:transparent;border:0;color:var(--text);text-align:left;cursor:pointer;font-weight:600;display:flex;align-items:center;justify-content:space-between" class="faq-head" aria-expanded="${i===0?'true':'false'}">
+            <span>${s.t}</span>
+            <svg class="faq-chev" style="transition:transform .25s ease;width:18px;height:18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-panel" style="max-height:0;overflow:hidden;transition:max-height .28s ease;padding:0 1rem;color:var(--muted);line-height:1.6">${s.d}</div>
+        `;
+        faqContainer.appendChild(item);
+        
+        const head = item.querySelector('.faq-head');
+        const panel = item.querySelector('.faq-panel');
+        const chev = item.querySelector('.faq-chev');
+        
+        if(i === 0) {
+          item.classList.add('open');
+          panel.style.maxHeight = panel.scrollHeight + 'px';
+        }
+        
+        head.addEventListener('click', () => {
+          const isOpen = item.classList.contains('open');
+          qsa('#detFaq > div').forEach(it => {
+            it.classList.remove('open');
+            it.querySelector('.faq-panel').style.maxHeight = '0px';
+            it.querySelector('.faq-chev').style.transform = '';
+          });
+          if(!isOpen) {
+            item.classList.add('open');
+            panel.style.maxHeight = panel.scrollHeight + 'px';
+            chev.style.transform = 'rotate(180deg)';
+          }
+        });
+      });
+    }
+
+    function openDetails(id) {
+      const p = CATALOG.find(x => x.id === id);
+      if(!p) return;
+      detCurrent = id;
+      qs('#detTitle').textContent = p.nome;
+      qs('#detMV').setAttribute('src', p.urlGLB);
+      qs('#detSketch').style.display = p.urlSketchfab ? 'inline-flex' : 'none';
+      if(p.urlSketchfab) qs('#detSketch').href = p.urlSketchfab;
+      const secs = DETAILS[id] || [];
+      buildFAQ(secs.length ? secs : [{t:"Informações",d:"Em preparação."}]);
+      qs('#detailsOverlay').classList.add('active');
+    }
+
+    qs('#closeDetails').onclick = () => qs('#detailsOverlay').classList.remove('active');
+    qs('#detAR').onclick = () => detCurrent && openMV(detCurrent);
+
+    /* ===========================
+       FAVORITOS
+    =========================== */
+    function renderFavs() {
+      const list = qs('#favList');
+      list.innerHTML = '';
+      if(!favs.size) {
+        list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❤️</div><p>Você ainda não favoritou exercícios</p></div>';
+        return;
+      }
+      [...favs].map(id => CATALOG.find(x => x.id === id)).forEach(p => {
+        if(!p) return;
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.innerHTML = `
+          <div class="list-item-info">
+            <h3>${p.nome}</h3>
+            <p>${p.grupo} • ${p.dificuldade} • ${p.series}x${p.repeticoes}</p>
+          </div>
+          <div class="list-item-actions">
+            <button class="btn" data-mv="${p.id}">Visualizar</button>
+            <button class="btn ghost" data-unfav="${p.id}">Remover</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+
+      qsa('[data-mv]', list).forEach(btn => btn.onclick = () => openMV(btn.dataset.mv));
+      qsa('[data-unfav]', list).forEach(btn => {
+        btn.onclick = () => {
+          favs.delete(btn.dataset.unfav);
+          localStorage.setItem('fisioar_favs', JSON.stringify([...favs]));
+          renderFavs();
+        };
+      });
+    }
+
+    /* ===========================
+       HISTÓRICO
+    =========================== */
+    function renderHistory() {
+      const list = qs('#histList');
+      list.innerHTML = '';
+      if(!history.length) {
+        list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>Seu histórico está vazio</p></div>';
+        return;
+      }
+      [...history].reverse().forEach(h => {
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.innerHTML = `
+          <div class="list-item-info">
+            <h3>${h.nome}</h3>
+            <p>${h.timestamp}</p>
+          </div>
+          <div class="list-item-actions">
+            <button class="btn" data-mv="${h.id}">Visualizar</button>
+            <button class="btn ghost" data-clear="${h.id}">Remover</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+
+      qsa('[data-mv]', list).forEach(btn => btn.onclick = () => openMV(btn.dataset.mv));
+      qsa('[data-clear]', list).forEach(btn => {
+        btn.onclick = () => {
+          history = history.filter(x => x.id !== btn.dataset.clear);
+          localStorage.setItem('fisioar_history', JSON.stringify(history));
+          renderHistory();
+        };
+      });
+    }
+
+    /* ===========================
+       AR POR MARCADOR
+    =========================== */
+    function injectScene(urlGLB) {
+      const arMount = qs('#arMount');
+      arMount.innerHTML = `
+        <a-scene embedded renderer="antialias:true; precision: mediump" vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:true" arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled:false;">
+          <a-marker preset="hiro" emitevents="true" id="marker">
+            <a-entity id="model" gltf-model="url(${urlGLB})" position="0 0 0" scale="0.3 0.3 0.3" animation="property: position; to: 0 0.02 0; dir: alternate; dur: 900; loop: true; easing: easeInOutSine"></a-entity>
+          </a-marker>
+          <a-entity camera></a-entity>
+        </a-scene>`;
+      
+      const modelEl = () => arMount.querySelector('#model');
+      qs('#rotL').onclick = () => { const m = modelEl(); if(!m) return; const r = m.getAttribute('rotation'); m.setAttribute('rotation', {x: r.x, y: r.y - 10, z: r.z}); };
+      qs('#rotR').onclick = () => { const m = modelEl(); if(!m) return; const r = m.getAttribute('rotation'); m.setAttribute('rotation', {x: r.x, y: r.y + 10, z: r.z}); };
+      qs('#scalePlus').onclick = () => { const m = modelEl(); if(!m) return; const s = m.getAttribute('scale'); m.setAttribute('scale', {x: s.x * 1.12, y: s.y * 1.12, z: s.z * 1.12}); };
+      qs('#scaleMinus').onclick = () => { const m = modelEl(); if(!m) return; const s = m.getAttribute('scale'); m.setAttribute('scale', {x: s.x / 1.12, y: s.y / 1.12, z: s.z / 1.12}); };
+    }
+
+    qs('#closeAR').onclick = () => {
+      qs('#arOverlay').classList.remove('active');
+      qs('#arMount').innerHTML = '';
+    };
+
+    qs('#snapshotBtn').onclick = async () => {
+      try {
+        const scene = qs('#arMount a-scene');
+        if(!scene || !scene.renderer) throw new Error('Cena não pronta');
+        const video = qs('#arMount video');
+        const glCanvas = scene.renderer.domElement;
+        const w = video ? video.videoWidth || glCanvas.width : glCanvas.width;
+        const h = video ? video.videoHeight || glCanvas.height : glCanvas.height;
+        const out = document.createElement('canvas');
+        out.width = w; out.height = h;
+        const ctx = out.getContext('2d');
+        if(video) ctx.drawImage(video, 0, 0, w, h);
+        ctx.drawImage(glCanvas, 0, 0, w, h);
+        const url = out.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'fisioar-snapshot.png';
+        a.click();
+      } catch(e) {
+        alert('Não foi possível capturar agora. Ative a câmera e tente de novo.');
+      }
+    };
+
+    // Adicionar favorito ao abrir detalhes
+    document.addEventListener('click', e => {
+      if(e.target.closest('[data-fav]')) {
+        const id = e.target.closest('[data-fav]').dataset.fav;
+        if(favs.has(id)) favs.delete(id);
+        else favs.add(id);
+        localStorage.setItem('fisioar_favs', JSON.stringify([...favs]));
+      }
+    });
+
+    /* ===========================
+       PROGRESSO DO USUÁRIO
+    =========================== */
+    function renderProgress() {
+      // Calcular estatísticas
+      const totalExercises = history.length;
+      const totalFavorites = favs.size;
+      
+      // Calcular dias ativos
+      const uniqueDays = new Set(history.map(h => h.timestamp.split(' ')[0]));
+      const activeDays = uniqueDays.size;
+      
+      // Calcular tempo total (estimado: 30min por exercício)
+      const totalTime = Math.round((totalExercises * 30) / 60);
+
+      // Atualizar cards de stats
+      qs('#totalExercises').textContent = totalExercises;
+      qs('#totalFavorites').textContent = totalFavorites;
+      qs('#activeDays').textContent = activeDays;
+      qs('#totalTime').textContent = totalTime + 'h';
+
+      // Gráfico de dificuldade
+      const diffCounts = { 'Iniciante': 0, 'Intermediário': 0, 'Avançado': 0 };
+      history.forEach(h => {
+        const ex = CATALOG.find(x => x.id === h.id);
+        if(ex) diffCounts[ex.dificuldade]++;
+      });
+      
+      const diffChart = qs('#difficultyChart');
+      diffChart.innerHTML = '';
+      const maxDiff = Math.max(...Object.values(diffCounts), 1);
+      ['Iniciante', 'Intermediário', 'Avançado'].forEach(d => {
+        const bar = document.createElement('div');
+        bar.className = 'chart-bar';
+        const height = (diffCounts[d] / maxDiff) * 100;
+        bar.style.height = Math.max(height, 10) + '%';
+        bar.innerHTML = `<div class="chart-bar-value">${diffCounts[d]}</div><div class="chart-bar-label">${d}</div>`;
+        diffChart.appendChild(bar);
+      });
+
+      // Gráfico de grupo muscular
+      const groupCounts = {};
+      CATALOG.forEach(ex => {
+        if(!groupCounts[ex.grupo]) groupCounts[ex.grupo] = 0;
+        const count = history.filter(h => h.id === ex.id).length;
+        groupCounts[ex.grupo] += count;
+      });
+      
+      const groupChart = qs('#groupChart');
+      groupChart.innerHTML = '';
+      const maxGroup = Math.max(...Object.values(groupCounts), 1);
+      Object.entries(groupCounts).forEach(([g, count]) => {
+        const bar = document.createElement('div');
+        bar.className = 'chart-bar';
+        const height = (count / maxGroup) * 100;
+        bar.style.height = Math.max(height, 10) + '%';
+        bar.innerHTML = `<div class="chart-bar-value">${count}</div><div class="chart-bar-label">${g}</div>`;
+        groupChart.appendChild(bar);
+      });
+
+      // Heatmap de atividade (últimos 7 dias)
+      const heatmap = qs('#heatmap');
+      heatmap.innerHTML = '';
+      const today = new Date();
+      for(let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayName = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'][date.getDay()];
+        
+        const count = history.filter(h => h.timestamp.startsWith(dateStr)).length;
+        const intensity = Math.min(Math.floor(count / 3), 3);
+        
+        const cell = document.createElement('div');
+        cell.className = `heatmap-cell ${count > 0 ? 'active-' + intensity : ''}`;
+        cell.title = `${dayName}: ${count} visualizações`;
+        cell.textContent = dayName;
+        heatmap.appendChild(cell);
+      }
+
+      // Top exercícios
+      const exerciseCount = {};
+      history.forEach(h => {
+        exerciseCount[h.id] = (exerciseCount[h.id] || 0) + 1;
+      });
+      
+      const topExercises = qs('#topExercises');
+      topExercises.innerHTML = '';
+      
+      const sorted = Object.entries(exerciseCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+      
+      if(sorted.length === 0) {
+        topExercises.innerHTML = '<p class="empty-state" style="padding:2rem 0">Nenhum exercício visualizado ainda</p>';
+        return;
+      }
+      
+      const maxCount = sorted[0][1];
+      sorted.forEach(([id, count]) => {
+        const ex = CATALOG.find(x => x.id === id);
+        if(!ex) return;
+        
+        const row = document.createElement('div');
+        row.className = 'exercise-row';
+        const percentage = (count / maxCount) * 100;
+        
+        row.innerHTML = `
+          <div>
+            <div class="exercise-name">${ex.nome}</div>
+            <div class="exercise-count">${ex.grupo} • ${ex.dificuldade}</div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${percentage}%"></div>
+          </div>
+          <div style="font-weight:700;color:var(--brand-light);min-width:40px;text-align:right">${count}x</div>
+        `;
+        topExercises.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
